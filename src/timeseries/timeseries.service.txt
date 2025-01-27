@@ -1,0 +1,122 @@
+import { Injectable } from '@nestjs/common';
+import { readFileSync } from 'fs';
+import { abc, getAll, ISO_data } from './interface/alldata.interface';
+import { dateDTO } from './dto/date.dto';
+import { json } from 'stream/consumers';
+
+@Injectable()
+export class TimeseriesService {
+  private data = [];
+  private countryData = [];
+  private ISO_code: ISO_data[] = [];
+
+  constructor() {
+    this.data = JSON.parse(readFileSync('src/series.json').toString());
+    this.countryData = JSON.parse(
+      readFileSync('src/countries.json').toString(),
+    );
+    this.getCode();
+  }
+
+  public getData() {
+    let result: getAll[] = [];
+
+    for (const country of Object.keys(this.data)) {
+      const name = country;
+      let confirmed,
+        deaths,
+        recovered = 0;
+
+      for (let i = 0; i < this.data[country].length; i++) {
+        confirmed += this.data[country][i]['confirmed'] ?? 0;
+        deaths += this.data[country][i]['deaths'] ?? 0;
+        recovered += this.data[country][i]['recovered'];
+      }
+
+      result.push({
+        name: name,
+        data: {
+          confirmed: confirmed,
+          deaths: deaths,
+          recovered: recovered,
+        },
+      });
+    }
+    // console.log(result);
+    return result;
+  }
+
+  public getDatabyDate(from: string, to: string) {
+    const result: abc[] = [];
+
+    const fromDate = this.parseDate(from);
+    const toDate = this.parseDate(to);
+
+    // console.log(Object.entries(this.data)[0][1][0].date)
+    // console.log(this.parseDate(Object.entries(this.data)[0][1][0].date).getTime() == fromDate.getTime())
+
+    let temp = Object.entries(this.data);
+    // console.log(temp[0][1])
+    for (let i = 0; i < temp.length; i++) {
+      // console.log(temp)
+      let country = temp[i][0];
+      let data = [];
+
+      // console.log(temp[i][1][0])
+        for (let j = 0; j < Object.entries(this.data)[i][1].length; j++) {
+          const date = this.parseDate(temp[i][1][j].date).getTime();
+          if (date >= fromDate.getTime() && date <= toDate.getTime())
+            data.push(temp[i][1][j]);
+        }
+      result.push({
+        name: country,
+        data: data,
+      });
+    }
+    // console.log(result)
+    return result;
+  }
+
+  public getByCountry(iso: string) {
+    iso = iso.toLowerCase();
+    let filterCountries = this.ISO_code.filter(({ name, code }) =>
+      code.toLowerCase().includes(iso),
+    ).map(({ name }) => name);
+    // console.log(filterCountries);
+
+    // let filterData = Object.keys((this.data)).filter((key) => filterCountries.includes(key))
+
+    let filterData = Object.entries(this.data).filter(([key, data]) =>
+        filterCountries.includes(key),
+      );
+
+    return filterData;
+  }
+
+  private parseDate(str: string): Date | null {
+    const date = new Date(str);
+    // console.log(date);
+    return date;
+  }
+
+  private getCode() {
+    for (const key of Object.keys(this.countryData)) {
+      // console.log(this.countryData[key]['code'])
+      const country = key;
+      const code = this.countryData[key]['code'] ?? '';
+      this.ISO_code.push({
+        name: country,
+        code: code,
+      });
+    }
+    // console.log(this.ISO_code);
+  }
+}
+
+// const parts = str.split('/');
+// if(parts.length !== 3) return null;
+
+// const [day,month,year] = parts.map(Number);
+// if(!day || !month || !year) return null;
+
+// console.log(day,'  ',month, '     ',year)
